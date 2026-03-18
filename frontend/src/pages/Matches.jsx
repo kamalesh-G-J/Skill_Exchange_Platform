@@ -2,15 +2,19 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/axios";
 import MatchCard from "../components/MatchCard";
+import CategoryFilter from "../components/CategoryFilter";
 
 const Matches = () => {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState("All");
 
   useEffect(() => {
     const fetchMatches = async () => {
+      setLoading(true);
       try {
-        const { data } = await api.get("/api/matches");
+        const queryParams = selectedCategory !== "All" ? `?category=${selectedCategory}` : "";
+        const { data } = await api.get(`/api/matches${queryParams}`);
         setMatches(data.matches || []);
       } catch (err) {
         console.error("Failed to fetch matches", err);
@@ -20,7 +24,7 @@ const Matches = () => {
     };
 
     fetchMatches();
-  }, []);
+  }, [selectedCategory]);
 
   if (loading) {
     return (
@@ -90,10 +94,23 @@ const Matches = () => {
         <h2 className="text-3xl font-bold text-gray-900 tracking-tight">
           Skill Matches
         </h2>
-        <p className="mt-2 text-gray-600">
-          We found {matches.length} user{matches.length !== 1 ? "s" : ""} with
-          compatible skills. Connect and start exchanging knowledge!
-        </p>
+        
+        {/* Category Filter */}
+        <div className="mt-6 mb-4">
+          <CategoryFilter 
+            selectedCategory={selectedCategory} 
+            onSelectCategory={setSelectedCategory} 
+          />
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-gray-600 mt-2 sm:mt-0 font-medium">
+            {selectedCategory !== 'All' && <span className="text-purple-600 mr-2">Showing: {selectedCategory} matches</span>}
+            <span className={selectedCategory !== 'All' ? 'text-gray-500' : ''}>
+              {matches.length} match{matches.length !== 1 ? "es" : ""} found
+            </span>
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

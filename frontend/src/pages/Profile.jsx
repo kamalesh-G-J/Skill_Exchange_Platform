@@ -65,6 +65,21 @@ const Profile = () => {
     }
   };
 
+  const handleStatusChange = async (newStatus) => {
+    try {
+      // Optimistic update
+      setUser(prev => ({ ...prev, availabilityStatus: newStatus }));
+      
+      const { data } = await api.put('/api/users/me', { availabilityStatus: newStatus });
+      setUser(data);
+      toast.success('Status updated');
+    } catch (err) {
+      toast.error('Failed to update status');
+      // Revert optimism if failed
+      setUser(prev => ({ ...prev, availabilityStatus: prev.availabilityStatus }));
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-[calc(100vh-64px)] items-center justify-center">
@@ -89,7 +104,7 @@ const Profile = () => {
       <div className="bg-white shadow rounded-lg overflow-hidden">
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-6 p-6 sm:p-10 border-b border-gray-100">
-          <Avatar name={user.name} size="lg" />
+          <Avatar name={user.name} size="lg" availabilityStatus={user.availabilityStatus || 'available'} />
           
           <div className="flex-1 text-center sm:text-left w-full">
             {!isEditing ? (
@@ -109,6 +124,46 @@ const Profile = () => {
                 <p className="mt-4 text-gray-600 max-w-2xl leading-relaxed">
                   {user.bio || 'No bio yet. Add one to let others know about you!'}
                 </p>
+
+                {/* Availability Toggles */}
+                <div className="mt-6">
+                  <span className="block text-sm font-medium text-gray-700 mb-2">Availability Status</span>
+                  <div className="inline-flex rounded-md shadow-sm" role="group">
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange('available')}
+                      className={`px-4 py-2 text-sm font-medium border rounded-l-lg focus:z-10 focus:ring-2 focus:ring-blue-500 transition-colors ${
+                        user.availabilityStatus === 'available' || !user.availabilityStatus
+                          ? 'bg-[#1D9E75] text-white border-[#1D9E75]'
+                          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      Available
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange('busy')}
+                      className={`px-4 py-2 text-sm font-medium border-t border-b focus:z-10 focus:ring-2 focus:ring-blue-500 transition-colors ${
+                        user.availabilityStatus === 'busy'
+                          ? 'bg-[#BA7517] text-white border-[#BA7517]'
+                          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      Busy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange('on_leave')}
+                      className={`px-4 py-2 text-sm font-medium border rounded-r-lg focus:z-10 focus:ring-2 focus:ring-blue-500 transition-colors ${
+                        user.availabilityStatus === 'on_leave'
+                          ? 'bg-[#888780] text-white border-[#888780]'
+                          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      On Leave
+                    </button>
+                  </div>
+                </div>
               </>
             ) : (
               <div className="w-full space-y-4 text-left">
@@ -184,11 +239,20 @@ const Profile = () => {
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {user.skillsOffered && user.skillsOffered.length > 0 ? (
-                    user.skillsOffered.map((skill, index) => (
-                      <span key={index} className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                        {skill}
-                      </span>
-                    ))
+                    user.skillsOffered.map((skill, index) => {
+                      const endorsementRecord = user.endorsements?.find(e => e.skill === skill);
+                      const count = endorsementRecord?.endorsedBy?.length || 0;
+                      return (
+                        <span key={index} className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                          {skill}
+                          {count > 0 && (
+                            <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-green-100 bg-green-700 rounded-full">
+                              +{count}
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })
                   ) : (
                     <span className="text-gray-500 italic text-sm">No skills listed yet.</span>
                   )}

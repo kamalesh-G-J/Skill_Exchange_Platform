@@ -1,4 +1,4 @@
-const SkillPill = ({ skill, color = 'gray' }) => {
+const SkillPill = ({ skill, category, color = 'gray' }) => {
   const colorClasses = {
     green: 'bg-green-100 text-green-800 border-green-200',
     purple: 'bg-purple-100 text-purple-800 border-purple-200',
@@ -9,7 +9,7 @@ const SkillPill = ({ skill, color = 'gray' }) => {
 
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${selectedClass}`}>
-      {skill}
+      {skill} {category && <span className="opacity-60 ml-1 font-normal">· {category}</span>}
     </span>
   );
 };
