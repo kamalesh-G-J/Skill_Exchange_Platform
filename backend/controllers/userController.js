@@ -17,7 +17,7 @@ const getMe = async (req, res, next) => {
 // PUT /api/users/me
 const updateMe = async (req, res, next) => {
   try {
-    const { name, bio, skillsOffered, skillsWanted } = req.body;
+    const { name, bio, skillsOffered, skillsWanted, availabilityStatus, skillCategories } = req.body;
 
     const user = await User.findById(req.user.id);
     if (!user) {
@@ -29,6 +29,8 @@ const updateMe = async (req, res, next) => {
     if (bio !== undefined) user.bio = bio;
     if (skillsOffered !== undefined) user.skillsOffered = skillsOffered;
     if (skillsWanted !== undefined) user.skillsWanted = skillsWanted;
+    if (availabilityStatus !== undefined) user.availabilityStatus = availabilityStatus;
+    if (skillCategories !== undefined) user.skillCategories = skillCategories;
 
     await user.save();
 

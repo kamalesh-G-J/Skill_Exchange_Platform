@@ -23,6 +23,7 @@ app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/matches", require("./routes/matchRoutes"));
 app.use("/api/requests", require("./routes/requestRoutes"));
 app.use("/api/sessions", require("./routes/sessionRoutes"));
+app.use("/api/endorsements", require("./routes/endorsements"));
 app.use("/api", require("./routes/reviewRoutes"));
 
 app.get("/", (req, res) => {

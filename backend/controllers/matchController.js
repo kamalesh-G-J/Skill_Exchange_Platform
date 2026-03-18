@@ -22,11 +22,19 @@ const getMatches = async (req, res, next) => {
       });
     }
 
-    const users = await User.find({
+    const { category } = req.query;
+
+    let query = {
       _id: { $ne: currentUser._id },
       skillsOffered: { $in: skillsWanted },
       skillsWanted: { $in: skillsOffered },
-    }).select("name bio skillsOffered skillsWanted rating totalReviews");
+    };
+
+    if (category && category !== 'All') {
+      query.skillCategories = { $in: [category] };
+    }
+
+    const users = await User.find(query).select("name bio skillsOffered skillsWanted rating totalReviews availabilityStatus skillCategories");
 
     const myWantedSet = new Set(skillsWanted);
     const myOfferedSet = new Set(skillsOffered);
@@ -40,6 +48,9 @@ const getMatches = async (req, res, next) => {
           myOfferedSet.has(s),
         ).length;
         const score = (offeredOverlap + wantedOverlap) * 10 + user.rating * 2;
+        
+        const totalPossible = skillsWanted.length + skillsOffered.length;
+        const matchPercent = totalPossible === 0 ? 0 : Math.min(Math.round(((offeredOverlap + wantedOverlap) / totalPossible) * 100), 99);
 
         return {
           _id: user._id,
@@ -50,9 +61,24 @@ const getMatches = async (req, res, next) => {
           rating: user.rating,
           totalReviews: user.totalReviews,
           score,
+          matchPercent,
+          availabilityStatus: user.availabilityStatus || 'available',
+          skillCategories: user.skillCategories || [],
         };
       })
-      .sort((a, b) => b.score - a.score);
+      .sort((a, b) => {
+        // Sort by availability first: available > busy > on_leave
+        const statusPriority = { available: 3, busy: 2, on_leave: 1 };
+        const pA = statusPriority[a.availabilityStatus] || 0;
+        const pB = statusPriority[b.availabilityStatus] || 0;
+        
+        if (pA !== pB) {
+          return pB - pA;
+        }
+
+        // Fallback to score
+        return b.score - a.score;
+      });
 
     res.json({ success: true, count: matches.length, matches });
   } catch (error) {

@@ -51,7 +51,8 @@ const createRequest = async (req, res, next) => {
 const getIncoming = async (req, res, next) => {
   try {
     const requests = await ExchangeRequest.find({ receiverId: req.user.id })
-      .populate("initiatorId", "name skillsOffered rating")
+      .populate("initiatorId", "name skillsOffered rating avatar")
+      .select("initiatorId receiverId offeredSkill wantedSkill status message matchScore scheduledAt createdAt")
       .sort({ createdAt: -1 });
 
     res.json({ success: true, count: requests.length, requests });
