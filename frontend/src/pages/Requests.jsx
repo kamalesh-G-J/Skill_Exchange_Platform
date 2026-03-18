@@ -1,29 +1,31 @@
-import { useState, useEffect } from 'react';
-import api from '../api/axios';
-import StatusBadge from '../components/StatusBadge';
+import { useState, useEffect } from "react";
+import api from "../api/axios";
+import StatusBadge from "../components/StatusBadge";
 
-const tabs = ['Incoming', 'Outgoing'];
+const tabs = ["Incoming", "Outgoing"];
 
 const Requests = () => {
-  const [activeTab, setActiveTab] = useState('Incoming');
+  const [activeTab, setActiveTab] = useState("Incoming");
   const [incoming, setIncoming] = useState([]);
   const [outgoing, setOutgoing] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [schedulingId, setSchedulingId] = useState(null);
 
   useEffect(() => {
     const fetchRequests = async () => {
       setLoading(true);
-      setError('');
+      setError("");
       try {
         const endpoint =
-          activeTab === 'Incoming' ? '/api/requests/incoming' : '/api/requests/outgoing';
+          activeTab === "Incoming"
+            ? "/api/requests/incoming"
+            : "/api/requests/outgoing";
         const { data } = await api.get(endpoint);
-        if (activeTab === 'Incoming') setIncoming(data);
-        else setOutgoing(data);
+        if (activeTab === "Incoming") setIncoming(data.requests || []);
+        else setOutgoing(data.requests || []);
       } catch {
-        setError('Failed to load requests.');
+        setError("Failed to load requests.");
       } finally {
         setLoading(false);
       }
@@ -33,13 +35,14 @@ const Requests = () => {
 
   const handleAccept = async (id) => {
     try {
-      await api.patch(`/api/requests/${id}/accept`);
+      const response = await api.patch(`/api/requests/${id}/accept`);
       setIncoming((prev) =>
-        prev.map((r) => (r._id === id ? { ...r, status: 'accepted' } : r))
+        prev.map((r) => (r._id === id ? { ...r, status: "accepted", sessionId: response.data.session._id } : r)),
       );
       setSchedulingId(id);
-    } catch {
-      setError('Failed to accept request.');
+    } catch (error) {
+      console.error("Accept Error:", error.response?.data || error.message);
+      setError(error.response?.data?.message || "Failed to accept request.");
     }
   };
 
@@ -47,20 +50,32 @@ const Requests = () => {
     try {
       await api.patch(`/api/requests/${id}/decline`);
       setIncoming((prev) => prev.filter((r) => r._id !== id));
-    } catch {
-      setError('Failed to decline request.');
+    } catch (error) {
+      setError(error.response?.data?.message || "Failed to decline request.");
     }
   };
 
   const handleSchedule = async (id, scheduledAt) => {
     try {
-      await api.patch(`/api/sessions/${id}/schedule`, { scheduledAt });
+      // Get the correct session ID created during accept
+      const reqObj = incoming.find(r => r._id === id);
+      const trueSessionId = reqObj?.sessionId || id;
+
+      await api.patch(`/api/sessions/${trueSessionId}/schedule`, { scheduledAt });
       setSchedulingId(null);
       setIncoming((prev) =>
-        prev.map((r) => (r._id === id ? { ...r, status: 'scheduled', scheduledAt } : r))
+        prev.map((r) =>
+          r._id === id ? { ...r, status: "scheduled", scheduledAt } : r,
+        ),
       );
-    } catch {
-      setError('Failed to schedule session.');
+
+      // Automatically generate Google Meet link after scheduling!
+      const authResponse = await api.get(`/api/calendar/auth-url?sessionId=${trueSessionId}`);
+      window.location.href = authResponse.data.url;
+
+    } catch (error) {
+      console.error("Schedule Error:", error.response?.data || error);
+      setError(error.response?.data?.message || "Failed to schedule session.");
     }
   };
 
@@ -76,8 +91,8 @@ const Requests = () => {
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-2 -mb-px text-sm font-medium transition-colors ${
               activeTab === tab
-                ? 'border-b-2 border-blue-600 text-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
+                ? "border-b-2 border-blue-600 text-blue-600"
+                : "text-gray-500 hover:text-gray-700"
             }`}
           >
             {tab}
@@ -89,12 +104,28 @@ const Requests = () => {
 
       {loading ? (
         <div className="flex justify-center py-12">
-          <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+          <svg
+            className="animate-spin h-8 w-8 text-blue-600"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+            />
           </svg>
         </div>
-      ) : activeTab === 'Incoming' ? (
+      ) : activeTab === "Incoming" ? (
         <IncomingList
           requests={incoming}
           schedulingId={schedulingId}
@@ -114,7 +145,7 @@ const Requests = () => {
 /* ── Incoming ─────────────────────────────────────────────── */
 
 const ScheduleInput = ({ initialDate, onSave, onCancel }) => {
-  const [date, setDate] = useState(initialDate || '');
+  const [date, setDate] = useState(initialDate || "");
   return (
     <div className="mt-3 flex gap-2 items-center flex-wrap">
       <input
@@ -123,14 +154,14 @@ const ScheduleInput = ({ initialDate, onSave, onCancel }) => {
         className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         onChange={(e) => setDate(e.target.value)}
       />
-      <button 
-        onClick={() => onSave(date)} 
+      <button
+        onClick={() => onSave(date)}
         disabled={!date}
         className="px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50"
       >
         Save
       </button>
-      <button 
+      <button
         onClick={onCancel}
         className="px-3 py-1.5 bg-gray-200 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-300"
       >
@@ -140,26 +171,45 @@ const ScheduleInput = ({ initialDate, onSave, onCancel }) => {
   );
 };
 
-const IncomingList = ({ requests, schedulingId, onAccept, onDecline, onSchedule, onEditSchedule, onCancelSchedule }) => {
+const IncomingList = ({
+  requests,
+  schedulingId,
+  onAccept,
+  onDecline,
+  onSchedule,
+  onEditSchedule,
+  onCancelSchedule,
+}) => {
   if (requests.length === 0) {
-    return <p className="text-gray-500 text-center py-12">No incoming requests yet.</p>;
+    return (
+      <p className="text-gray-500 text-center py-12">
+        No incoming requests yet.
+      </p>
+    );
   }
 
   return (
     <div className="space-y-4">
       {requests.map((req) => (
-        <div key={req._id} className="bg-white rounded-lg shadow p-4 flex items-start gap-4">
+        <div
+          key={req._id}
+          className="bg-white rounded-lg shadow p-4 flex items-start gap-4"
+        >
           <img
-            src={req.from?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(req.from?.name || 'U')}&background=random`}
-            alt={req.from?.name}
+            src={
+              req.initiatorId?.avatar ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(req.initiatorId?.name || "U")}&background=random`
+            }
+            alt={req.initiatorId?.name}
             className="w-10 h-10 rounded-full object-cover"
           />
 
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-gray-900">{req.from?.name}</p>
+            <p className="font-medium text-gray-900">{req.initiatorId?.name}</p>
             <p className="text-sm text-gray-600 mt-0.5">
-              <span className="font-medium">Offers:</span> {req.skillOffered}{' · '}
-              <span className="font-medium">Wants:</span> {req.skillWanted}
+              <span className="font-medium">Offers:</span> {req.offeredSkill}
+              {" · "}
+              <span className="font-medium">Wants:</span> {req.wantedSkill}
             </p>
             <p className="text-xs text-gray-400 mt-1">
               {new Date(req.createdAt).toLocaleDateString()}
@@ -177,7 +227,9 @@ const IncomingList = ({ requests, schedulingId, onAccept, onDecline, onSchedule,
             {/* Display scheduled date if set */}
             {req.scheduledAt && schedulingId !== req._id && (
               <p className="mt-2 text-sm text-gray-700">
-                <span className="font-semibold text-gray-900">Scheduled for:</span>{' '}
+                <span className="font-semibold text-gray-900">
+                  Scheduled for:
+                </span>{" "}
                 {new Date(req.scheduledAt).toLocaleString()}
                 <button
                   onClick={() => onEditSchedule(req._id)}
@@ -189,7 +241,7 @@ const IncomingList = ({ requests, schedulingId, onAccept, onDecline, onSchedule,
             )}
           </div>
 
-          {req.status === 'pending' && (
+          {req.status === "pending" && (
             <div className="flex flex-col gap-2">
               <button
                 onClick={() => onAccept(req._id)}
@@ -206,7 +258,7 @@ const IncomingList = ({ requests, schedulingId, onAccept, onDecline, onSchedule,
             </div>
           )}
 
-          {req.status !== 'pending' && <StatusBadge status={req.status} />}
+          {req.status !== "pending" && <StatusBadge status={req.status} />}
         </div>
       ))}
     </div>
@@ -217,18 +269,26 @@ const IncomingList = ({ requests, schedulingId, onAccept, onDecline, onSchedule,
 
 const OutgoingList = ({ requests }) => {
   if (requests.length === 0) {
-    return <p className="text-gray-500 text-center py-12">You haven't sent any requests yet.</p>;
+    return (
+      <p className="text-gray-500 text-center py-12">
+        You haven't sent any requests yet.
+      </p>
+    );
   }
 
   return (
     <div className="space-y-4">
       {requests.map((req) => (
-        <div key={req._id} className="bg-white rounded-lg shadow p-4 flex items-center justify-between">
+        <div
+          key={req._id}
+          className="bg-white rounded-lg shadow p-4 flex items-center justify-between"
+        >
           <div>
-            <p className="font-medium text-gray-900">{req.to?.name}</p>
+            <p className="font-medium text-gray-900">{req.receiverId?.name}</p>
             <p className="text-sm text-gray-600 mt-0.5">
-              <span className="font-medium">Offers:</span> {req.skillOffered}{' · '}
-              <span className="font-medium">Wants:</span> {req.skillWanted}
+              <span className="font-medium">Offers:</span> {req.offeredSkill}
+              {" · "}
+              <span className="font-medium">Wants:</span> {req.wantedSkill}
             </p>
           </div>
           <StatusBadge status={req.status} />
